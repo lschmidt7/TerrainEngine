@@ -1,0 +1,63 @@
+﻿// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel Deform
+#pragma kernel DeformVertex
+
+#include "CGInc/structs.cginc"
+#include "CGInc/deform_functions.cginc"
+
+RWStructuredBuffer<Data> buffer;
+RWStructuredBuffer<float3> vertices;
+
+float mouse_x=-400;
+float mouse_z=-400;
+
+float sculpImpact;
+float sculpArea;
+float sculpHeightMaxLimit;
+float sculpHeightMinLimit;
+bool sculpUp;
+
+float distance(float3 p){
+    float dist = sqrt(pow(p.x-mouse_x,2)+pow(p.z-mouse_z,2));
+    if(dist<sculpArea)
+        return dist;
+    return -1;
+}
+
+[numthreads(32,1,1)]
+void Deform (uint3 id : SV_DispatchThreadID)
+{
+    float dist = distance(buffer[id.x].pos);
+    if(dist!=-1){
+        float newHeight;
+        if(sculpUp)
+            newHeight = buffer[id.x].pos.y+sigmoid(sculpArea/(sculpArea-dist))*sculpImpact;
+        else
+            newHeight = buffer[id.x].pos.y-sigmoid(sculpArea/(sculpArea-dist))*sculpImpact;
+        
+        if(newHeight>sculpHeightMaxLimit)
+            newHeight = sculpHeightMaxLimit;
+        if(newHeight<sculpHeightMinLimit)
+            newHeight = sculpHeightMinLimit;
+        buffer[id.x].pos.y = newHeight;
+    }
+}
+
+[numthreads(32,1,1)]
+void DeformVertex (uint3 id : SV_DispatchThreadID)
+{
+    float dist = distance(vertices[id.x]);
+    if(dist!=-1){
+        float newHeight;
+        if(sculpUp)
+            newHeight = vertices[id.x].y+sigmoid(sculpArea/(sculpArea-dist))*sculpImpact;
+        else
+            newHeight = vertices[id.x].y-sigmoid(sculpArea/(sculpArea-dist))*sculpImpact;
+        
+        if(newHeight>sculpHeightMaxLimit)
+            newHeight = sculpHeightMaxLimit;
+        if(newHeight<sculpHeightMinLimit)
+            newHeight = sculpHeightMinLimit;
+        vertices[id.x].y = newHeight;
+    }
+}
